@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Real-time VLM monitor (POC).
 
 Phase-1 pure-VLM cascade: sample frames from a video source, ask the VLM whether
@@ -16,15 +15,13 @@ Live control:
   - Type a new rule + Enter in the terminal to change what's being watched, live.
 
 Examples:
-    python run.py --backend gemini --model gemini-3.1-flash-lite --workers 6 \\
+    python -m gavi monitor --backend gemini --model gemini-3.1-flash-lite --workers 6 \\
         --interval 0 --rule "a person is not wearing a hard hat" --display
 """
 
 from __future__ import annotations
 
 import argparse
-import os
-import subprocess
 import sys
 import threading
 import time
@@ -32,99 +29,9 @@ from datetime import datetime
 
 import cv2
 
-from backends import Verdict, make_backend
-
-
-# --- terminal color (auto-disabled when output isn't a TTY) ------------------
-_USE_COLOR = sys.stdout.isatty()
-
-
-def c(text: str, codes: str) -> str:
-    return f"\033[{codes}m{text}\033[0m" if _USE_COLOR else text
-
-
-def load_dotenv(path: str = ".env") -> None:
-    """Minimal .env loader (no dependency): KEY=value lines; existing env wins."""
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
-
-
-def open_source(source: str) -> cv2.VideoCapture:
-    # "0"/"1" -> webcam index; anything else -> file path or RTSP/HTTP URL.
-    cap = cv2.VideoCapture(int(source)) if source.isdigit() else cv2.VideoCapture(source)
-    if not cap.isOpened():
-        sys.exit(f"Could not open video source: {source!r}")
-    # Webcams need a few frames to warm up; this also catches all-black frames
-    # (on macOS, almost always a missing Camera permission).
-    if source.isdigit():
-        brightness = 0.0
-        for _ in range(10):
-            ok, frame = cap.read()
-            if ok and frame is not None:
-                brightness = float(frame.mean())
-                if brightness > 5:
-                    break
-            time.sleep(0.05)
-        if brightness <= 5:
-            print(
-                "WARNING: camera frames are black. On macOS this is almost always a "
-                "Camera permission issue.\n"
-                "  Fix: System Settings → Privacy & Security → Camera → enable the app "
-                "running Python\n"
-                "       (Terminal / iTerm / VS Code), then FULLY quit and reopen it.\n"
-                "  Or try a different camera: --source 1  (or 2).",
-                file=sys.stderr,
-            )
-    return cap
-
-
-def motion_fraction(prev_gray, gray) -> float:
-    """Fraction of pixels that changed meaningfully between two frames."""
-    return float((cv2.absdiff(prev_gray, gray) > 25).mean())
-
-
-def downscale(frame, max_side: int):
-    """Shrink so the longest side <= max_side (fewer vision tokens = faster VLM)."""
-    if max_side <= 0:
-        return frame
-    h, w = frame.shape[:2]
-    if max(h, w) <= max_side:
-        return frame
-    s = max_side / max(h, w)
-    return cv2.resize(frame, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA)
-
-
-def notify(rule: str, verdict: Verdict, frame, evidence_dir: str) -> None:
-    ts = datetime.now()
-    os.makedirs(evidence_dir, exist_ok=True)
-    path = os.path.join(evidence_dir, ts.strftime("%Y%m%d_%H%M%S_%f.jpg"))
-    cv2.imwrite(path, frame)
-    print(
-        c(
-            f"🚨 [{ts:%Y-%m-%d %H:%M:%S}] ALERT: {rule}  "
-            f"({verdict.confidence:.0%}) — {verdict.reason}",
-            "1;97;41",  # bold white on red background
-        ),
-        flush=True,
-    )
-    print(c(f"          evidence: {path}", "90"), flush=True)
-    if sys.platform == "darwin":
-        body = verdict.reason.replace('"', "'")[:200]
-        subprocess.run(
-            [
-                "osascript",
-                "-e",
-                f'display notification "{body}" with title "VLM Alert: {rule[:60]}"',
-            ],
-            check=False,
-        )
+from gavi.backends import Verdict, make_backend
+from gavi.utils import c, load_dotenv, notify
+from gavi.video import downscale, motion_fraction, open_source
 
 
 class Monitor:
@@ -230,8 +137,8 @@ def stdin_rule_listener(monitor: Monitor, stop: threading.Event) -> None:
             print(c(f"  → rule updated: {rule!r}", "1;96"), flush=True)  # bold cyan
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Real-time VLM monitor (POC)")
+def main(argv: list[str] | None = None) -> None:
+    p = argparse.ArgumentParser(prog="python -m gavi monitor", description="Real-time VLM monitor (POC)")
     p.add_argument("--rule", required=True, help="Plain-English condition to watch for (editable live via stdin)")
     p.add_argument("--source", default="0", help="Webcam index, file path, or RTSP/HTTP URL (default: 0)")
     p.add_argument("--backend", default="ollama", choices=["ollama", "gemini"])
@@ -246,7 +153,7 @@ def main() -> None:
     p.add_argument("--motion-threshold", type=float, default=0.01, help="Changed-pixel fraction that counts as motion")
     p.add_argument("--display", action="store_true", help="Show the video window with a live status overlay (press q to quit)")
     p.add_argument("--evidence-dir", default="evidence")
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     load_dotenv()  # pick up GEMINI_API_KEY from .env if present
     backend = make_backend(args.backend, args.model, args.sensitivity)

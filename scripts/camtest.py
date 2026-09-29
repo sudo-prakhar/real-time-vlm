@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose which camera index works. Run:  python camtest.py
+"""Diagnose which camera index works. Run:  python scripts/camtest.py
 
 Reports each index: can it open, and are the frames real (not black)?
 A black result on macOS means the app running Python lacks Camera permission.
@@ -29,4 +29,4 @@ for idx in range(4):
     verdict = "BLACK — likely Camera permission" if avg < 5 else "OK — real frames"
     print(f"index {idx}: opened, avg brightness {avg:5.1f}  ->  {verdict}")
 
-print("\nUse a working index with:  python run.py --source <idx> --rule '...' --display")
+print("\nUse a working index with:  python -m gavi monitor --source <idx> --rule '...' --display")

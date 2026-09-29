@@ -1,13 +1,13 @@
+# Only gavi/ and web/ are copied into the image; keep the build context small
+# and never send secrets or local data to the Docker daemon.
 .env
+.env.*
 .git
 .claude
 evidence/
 world/
+scripts/
 __pycache__/
 *.pyc
-camtest.py
-world_run.py
-make_hero.py
 Makefile
 README.md
-.env.*

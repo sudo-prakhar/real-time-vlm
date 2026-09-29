@@ -1,9 +1,10 @@
 """The shared world-update cycle: OBSERVE -> MATCH -> APPLY -> REASON.
 
-Both runtimes drive this one function — world_run.py (terminal) and app.py
-(web) — so the pipeline can't drift between them. It takes a burst of frames
-and a WorldModel, runs one full perception cycle, and returns everything a
-frontend needs to render: events, present boxes, new thumbnails, rule verdict.
+Both runtimes drive this one function — world_monitor.py (terminal) and
+server.py (web) — so the pipeline can't drift between them. It takes a burst
+of frames and a WorldModel, runs one full perception cycle, and returns
+everything a frontend needs to render: events, present boxes, new thumbnails,
+rule verdict.
 """
 
 from __future__ import annotations
@@ -14,10 +15,10 @@ from dataclasses import dataclass, field
 
 import cv2
 
-import identity
-from backends import Verdict, extract_json
-from run import downscale, motion_fraction
-from world import Event, WorldModel
+from gavi import identity
+from gavi.backends import Verdict, extract_json
+from gavi.video import downscale, motion_fraction
+from gavi.world import Event, WorldModel
 
 
 class MotionGate:

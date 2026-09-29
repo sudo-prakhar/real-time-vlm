@@ -13,9 +13,9 @@ RUN pip install --no-cache-dir \
     fastapi uvicorn[standard] opencv-python-headless numpy scipy \
     requests google-genai
 
-COPY backends.py engine.py identity.py run.py world.py app.py ./
+COPY gavi/ gavi/
 COPY web/ web/
 
 # Railway injects PORT; default for local docker runs
 ENV PORT=8000
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT}"]
+CMD ["sh", "-c", "uvicorn gavi.server:app --host 0.0.0.0 --port ${PORT}"]

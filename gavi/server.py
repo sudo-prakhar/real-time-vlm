@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """GAVI web app: the landing page + live browser demos.
 
 Two demo modes share one pipeline (engine.run_cycle):
@@ -30,14 +29,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from backends import make_backend
-from engine import MotionGate, run_cycle
-from run import load_dotenv
-from world import WorldModel
+from gavi.backends import make_backend
+from gavi.engine import MotionGate, run_cycle
+from gavi.utils import load_dotenv
+from gavi.world import WorldModel
 
 load_dotenv()
 
-WEB_DIR = Path(__file__).parent / "web"
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 ASSETS = WEB_DIR / "assets"
 BACKEND_NAME = "gemini"
 BACKEND_MODEL = "gemini-3.1-flash-lite"

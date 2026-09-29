@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """Long-horizon world-model monitor (Phase 2).
 
-Where run.py judges each frame in isolation, this keeps a persistent world
+Where monitor.py judges each frame in isolation, this keeps a persistent world
 model: a registry of entities (tracked across exits/re-entries — object
 permanence) and an event timeline including *inferences* about what happened
 off-screen. Each cycle sends the VLM the current frame PLUS the world state;
 the model returns a delta that world.WorldModel folds in and persists.
 
-Concurrency model: unlike run.py's stateless worker pool, updates are serial —
+Concurrency model: unlike monitor.py's stateless worker pool, updates are serial —
 each call must see the state the previous call produced — so there is ONE
 updater thread. Q&A runs on its own thread so questions never stall tracking.
 
@@ -16,8 +15,8 @@ Live control (type in the terminal):
     the person has been gone > 1m   -> replace the watch rule (blank line clears)
 
 Examples:
-    python world_run.py --backend gemini --model gemini-3.1-flash-lite --display
-    python world_run.py --rule "the desk is left unattended" --fresh
+    python -m gavi world --backend gemini --model gemini-3.1-flash-lite --display
+    python -m gavi world --rule "the desk is left unattended" --fresh
 """
 
 from __future__ import annotations
@@ -31,10 +30,11 @@ from datetime import datetime
 
 import cv2
 
-from backends import Verdict, make_backend
-from engine import MotionGate, parse_box, run_cycle  # parse_box re-exported for tests/tools
-from run import c, load_dotenv, notify, open_source
-from world import WorldModel
+from gavi.backends import Verdict, make_backend
+from gavi.engine import MotionGate, run_cycle
+from gavi.utils import c, load_dotenv, notify
+from gavi.video import open_source
+from gavi.world import WorldModel
 
 EVENT_COLORS = {
     "entered": "1;92",
@@ -123,7 +123,7 @@ class WorldMonitor:
 def update_loop(mon: WorldMonitor, stop: threading.Event) -> None:
     """The serial world-update cycle: OBSERVE (vision, memory-blind) ->
     MATCH (code: appearance + motion continuity) -> REASON (text, memory-aware,
-    skipped when nothing changed). See world.py for why it's split this way."""
+    skipped when nothing changed). See gavi/world.py for why it's split this way."""
     args, world = mon.args, mon.world
     thumb_dir = os.path.join(args.world_dir, "entities")
     while not stop.is_set():
@@ -207,8 +207,8 @@ def stdin_loop(mon: WorldMonitor, stop: threading.Event) -> None:
             print(c(f"  → {msg}", "1;96"), flush=True)
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description="Long-horizon world-model monitor (Phase 2)")
+def main(argv: list[str] | None = None) -> None:
+    p = argparse.ArgumentParser(prog="python -m gavi world", description="Long-horizon world-model monitor (Phase 2)")
     p.add_argument("--rule", default=None, help="Optional watch rule — may be temporal ('the mug has been gone for 5 minutes')")
     p.add_argument("--source", default="0", help="Webcam index, file path, or RTSP/HTTP URL (default: 0)")
     p.add_argument("--backend", default="ollama", choices=["ollama", "gemini"])
@@ -227,7 +227,7 @@ def main() -> None:
     p.add_argument("--cooldown", type=float, default=30.0, help="Min seconds between repeat alerts (default 30)")
     p.add_argument("--display", action="store_true", help="Show the video with world-state overlay (press q to quit)")
     p.add_argument("--evidence-dir", default="evidence")
-    args = p.parse_args()
+    args = p.parse_args(argv)
 
     load_dotenv()
     backend = make_backend(args.backend, args.model, sensitivity="balanced")

@@ -11,7 +11,7 @@ run through the REAL pipeline (fresh world per act, its own watch rule) and
 the boxes/events/rule-verdicts are saved to web/assets/hero_tracks.json for
 the landing page to replay in sync. Nothing in the overlay is invented.
 
-Usage:  python make_hero.py            (expects the clips in web/assets/)
+Usage:  python scripts/make_hero.py    (expects the clips in web/assets/; needs ffmpeg)
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -26,14 +27,15 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from run import load_dotenv
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))  # make `gavi` importable when run as a script
 
-load_dotenv()
-from backends import make_backend
-from engine import run_cycle
-from world import WorldModel
+from gavi.backends import make_backend  # noqa: E402
+from gavi.engine import run_cycle  # noqa: E402
+from gavi.utils import load_dotenv  # noqa: E402
+from gavi.world import WorldModel  # noqa: E402
 
-ASSETS = Path(__file__).parent / "web" / "assets"
+ASSETS = ROOT / "web" / "assets"
 W, H, FPS = 1280, 720, 24
 
 # (clip file, in-point seconds, seconds to use)
@@ -178,6 +180,7 @@ def trace_act(video: Path, backend, act: str, start: float, end: float) -> dict:
 
 
 def main() -> None:
+    load_dotenv(str(ROOT / ".env"))
     acts = build_video()
     backend = make_backend("gemini", "gemini-3.1-flash-lite", "balanced")
     segments = [trace_act(ASSETS / "hero.mp4", backend, a, s, e) for a, s, e in acts]

@@ -1,4 +1,7 @@
 opencv-python      # video capture + frame encoding
+numpy
+scipy              # optimal identity assignment (Hungarian); greedy fallback without it
 requests           # Ollama backend (local)
 google-genai       # Gemini backend (cloud) — only needed if you use --backend gemini
-scipy              # optimal identity assignment (Hungarian); greedy fallback without it
+fastapi            # web app (make web)
+uvicorn[standard]

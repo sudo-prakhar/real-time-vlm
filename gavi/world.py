@@ -12,7 +12,7 @@ module adds the memory. A WorldModel holds:
     actions, and *inferences* (the model's best guess at what happened while
     something was out of view — the "fill in the gaps" part).
 
-The update cycle (driven by world_run.py) is two calls per frame:
+The update cycle (engine.run_cycle) is two calls per frame:
 
   A. OBSERVE (vision, memory-BLIND): "describe the entities you see", with
      bounding boxes. The world state is deliberately kept out of this prompt —
