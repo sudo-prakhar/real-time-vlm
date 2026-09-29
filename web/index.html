@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GAVI — General Artificial Visual Intelligence</title>
+<style>
+  :root{
+    --ink:#0a0a0c; --sub:#6d727c; --line:#e8e9ec; --accent:#2f6bff;
+    --panel:#0e0f13; --card:#f4f5f7; --green:#22c55e; --amber:#f59e0b;
+    --purple:#a78bfa; --blue:#60a5fa; --yellow:#eab308; --grey:#9ca3af;
+    --hud:#6ee7b7; --radius:28px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",Inter,"Helvetica Neue",Arial,sans-serif;
+       background:#fff;color:var(--ink);-webkit-font-smoothing:antialiased}
+  .mono{font-family:"SF Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 24px}
+  button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
+
+  nav{position:sticky;top:0;background:rgba(255,255,255,.86);backdrop-filter:blur(14px);
+      border-bottom:1px solid transparent;z-index:50;transition:border-color .2s}
+  nav.scrolled{border-color:var(--line)}
+  .nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+  .logo{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  .logo b{color:var(--accent)}
+  .nav-links{display:flex;gap:30px;align-items:center;font-size:15px;color:#3d4149}
+  .nav-links a:hover{color:var(--ink)}
+  .pill{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:10px 22px;
+        font-size:15px;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s}
+  .pill.primary{background:var(--accent);color:#fff}
+  .pill.primary:hover{background:#1f56e6}
+  .pill.ghost{background:transparent;border-color:#d9dbe0;color:var(--ink)}
+  .pill.ghost:hover{border-color:#b9bcc4}
+  .pill.glass{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff;backdrop-filter:blur(8px)}
+  .pill.glass:hover{background:rgba(255,255,255,.2)}
+  @media(max-width:820px){.nav-links a:not(.pill){display:none}}
+
+  /* ---- hero: video + HUD ---- */
+  .hero{padding:18px 0 10px}
+  .hero-panel{position:relative;border-radius:var(--radius);overflow:hidden;background:var(--panel);
+              height:86vh;height:86svh;min-height:560px}
+  .hero-stage{position:absolute;inset:0}
+  .hero-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
+  .hero-shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,9,12,.25) 0%,rgba(8,9,12,.05) 40%,rgba(8,9,12,.78) 100%)}
+  #hud{position:absolute;inset:0;width:100%;height:100%}
+  /* the live caption layer — the narrative is the point, boxes are texture */
+  .hud-dom{position:absolute;top:22px;left:24px;max-width:min(600px,60%);
+           display:flex;flex-direction:column;gap:9px;align-items:flex-start;pointer-events:none}
+  .hud-act{font-size:11.5px;letter-spacing:.09em;color:#9fe8c8;
+           background:rgba(10,13,18,.72);padding:6px 12px;border-radius:8px;backdrop-filter:blur(6px)}
+  .hud-cap{font-size:16px;line-height:1.5;color:#f2fff8;font-weight:500;
+           background:rgba(10,13,18,.82);padding:11px 15px;border-radius:11px;
+           border-left:3px solid var(--hud);backdrop-filter:blur(6px);
+           opacity:0;transform:translateY(-4px);transition:opacity .3s,transform .3s}
+  /* clamp lives on an inner element: line-clamp directly on a padded box lets
+     the cut line peek through the bottom padding */
+  .hud-cap .cap-txt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .hud-cap.show{opacity:1;transform:none}
+  .hud-cap.alert{border-left-color:#ff6b6b;color:#ffe3e3;background:rgba(84,14,14,.86)}
+  .hud-tag{position:absolute;right:24px;bottom:20px;font-size:10.5px;color:rgba(190,225,205,.6);
+           background:rgba(12,15,20,.55);padding:5px 11px;border-radius:7px}
+  @media(max-width:700px){
+    /* the video keeps its native 16:9 — full scene visible; captions and copy
+       flow BELOW it on the dark panel */
+    .hero-panel{height:auto;min-height:0}
+    .hero-stage{position:relative;aspect-ratio:16/9}
+    .hero-shade{display:none}
+    .hud-dom{position:static;max-width:none;padding:16px 20px 0;gap:8px}
+    .hud-act{font-size:10px;padding:5px 10px}
+    .hud-cap{font-size:13px;padding:9px 12px;border-radius:9px;border-left-width:2px;
+             min-height:58px;width:100%}
+    .hud-tag{display:none}
+    .hero{padding:12px 0 6px}
+  }
+  .hero-copy{position:absolute;left:0;right:0;bottom:0;padding:52px 56px}
+  .eyebrow{color:#9db9ff;font-size:13px;letter-spacing:.14em;margin-bottom:14px}
+  h1{color:#fff;font-size:clamp(64px,9vw,132px);line-height:.92;font-weight:700;letter-spacing:-.045em}
+  @media(max-width:700px){
+    .hero-copy{position:static;padding:24px 20px 28px}
+    .eyebrow{font-size:10.5px;letter-spacing:.1em}
+    h1{font-size:58px}
+  }
+  h1 b{color:var(--accent)}
+  .oneliner{color:#fff;font-size:clamp(24px,3.2vw,44px);font-weight:600;letter-spacing:-.02em;margin-top:18px}
+  .hero-ctas{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+
+  section{padding:100px 0}
+  h2{font-size:clamp(38px,4.6vw,60px);font-weight:600;letter-spacing:-.03em;line-height:1.05}
+  .sec-eyebrow{color:var(--accent);font-size:14px;font-weight:500;margin-bottom:14px;display:block}
+  .sec-sub{color:var(--sub);font-size:clamp(17px,1.8vw,21px);margin-top:16px}
+
+  /* ---- demo carousel ---- */
+  .tabs{display:flex;gap:36px;margin-top:44px;border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap;
+        scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{padding:0 2px 16px;font-size:16.5px;color:#9aa0aa;display:flex;gap:10px;align-items:baseline;
+       border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s}
+  .tab .n{font-size:12px}
+  .tab.active{color:var(--ink);border-color:var(--accent)}
+  .tab:hover{color:var(--ink)}
+  .tab-desc{margin-top:18px;color:var(--sub);font-size:16px;min-height:22px}
+
+  .demo-panel{background:var(--panel);border-radius:var(--radius);padding:26px;color:#e8eaee;margin-top:22px}
+  /* fixed-size widget: three columns, internal scrolling, no layout shift */
+  .demo-grid{display:grid;grid-template-columns:280px minmax(0,1fr) 280px;gap:18px;height:580px}
+  .demo-grid>*{min-width:0;min-height:0}
+  /* (responsive demo-widget overrides live at the END of this stylesheet —
+      they must come after every base rule they override) */
+  .demo-col{display:flex;flex-direction:column;gap:18px;min-height:0}
+  .demo-center{display:flex;flex-direction:column;gap:10px;min-width:0}
+  .sec{display:flex;flex-direction:column;min-height:0}
+  .sec.grow{flex:1}
+  .wtabs,.wtab-desc{display:none} /* mobile-only pane switcher; styled in the responsive block */
+  .stage{position:relative;border-radius:18px;overflow:hidden;background:#000;aspect-ratio:16/9}
+  .stage img,.stage video{width:100%;height:100%;object-fit:cover;display:block}
+  .stage video{transform:scaleX(-1)}
+  .stage canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  .stage .cover{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;align-items:center;
+        justify-content:center;background:linear-gradient(180deg,rgba(10,12,16,.45),rgba(10,12,16,.8));
+        text-align:center;padding:20px}
+  .stage .cover p{color:#c3c8d0;font-size:13.5px;max-width:44ch;line-height:1.5;
+        text-shadow:0 1px 8px rgba(0,0,0,.6)}
+  .controls{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .ctl{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:9px 18px;font-size:14px;
+       font-weight:500;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);color:#fff;transition:all .15s}
+  .ctl:hover{background:rgba(255,255,255,.15)}
+  .ctl.primary{background:var(--accent);border-color:var(--accent)}
+  .ctl.primary:hover{background:#1f56e6}
+  .ctl:disabled{opacity:.4;cursor:default}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+  .chip{font-size:12px;color:#c6cad2;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+        padding:5px 12px;border-radius:999px}
+  .chip b{color:#fff;font-weight:600}
+  .scene-line{color:#a2a7b1;font-size:13.5px;min-height:18px;font-style:italic;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rule-banner{max-height:96px;overflow-y:auto}
+  .col-label{font-size:10.5px;color:#7d838d;letter-spacing:.1em;margin-bottom:8px;flex-shrink:0}
+  .roster{display:flex;flex-direction:column;gap:6px;overflow-y:auto;height:186px;flex-shrink:0;
+          -webkit-mask-image:linear-gradient(180deg,#000 86%,transparent);
+          mask-image:linear-gradient(180deg,#000 86%,transparent);padding-bottom:14px}
+  .roster:empty::before{content:"nothing discovered yet";color:#5c626d;font-size:12.5px}
+  .card{display:flex;gap:10px;align-items:center;background:rgba(255,255,255,.05);
+        border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:7px 10px;flex-shrink:0}
+  .card img{width:42px;height:42px;border-radius:9px;object-fit:cover;background:#1a1c22;flex-shrink:0}
+  .card .meta{min-width:0}
+  .card .cid{display:flex;align-items:center;gap:6px;font-weight:600;color:#fff;font-size:12px}
+  .card .cid i{width:6px;height:6px;border-radius:50%;background:#555;display:inline-block;flex-shrink:0}
+  .card.present .cid i{background:var(--green)}
+  .card small{display:block;color:#8d929c;font-size:11px;margin-top:1px;
+              white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chat{background:rgba(47,107,255,.05);border:1px solid rgba(47,107,255,.14);border-radius:14px;
+        padding:10px;overflow-y:auto;flex:1;min-height:70px;display:flex;flex-direction:column;gap:7px;
+        font-size:12.5px;margin-bottom:8px;
+        -webkit-mask-image:linear-gradient(180deg,#000 90%,transparent);
+        mask-image:linear-gradient(180deg,#000 90%,transparent)}
+  .chat:empty::before{content:"answers appear here — try a suggestion below";color:#525866}
+  .chat .msg{padding:7px 10px;border-radius:9px;line-height:1.5;color:#dfe7ff;
+        background:rgba(47,107,255,.12);border:1px solid rgba(47,107,255,.2);flex-shrink:0}
+  .suggs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;flex-shrink:0}
+  .sugg{font-size:11.5px;color:#aeb6c2;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);
+        border-radius:999px;padding:5px 11px;cursor:pointer;transition:all .12s;font-family:inherit}
+  .sugg:hover{background:rgba(255,255,255,.13);color:#fff}
+  .feed{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;
+        padding:10px;overflow-y:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px;
+        -webkit-mask-image:linear-gradient(180deg,#000 92%,transparent);
+        mask-image:linear-gradient(180deg,#000 92%,transparent)}
+  .feed:empty::before{content:"GAVI's understanding appears here…";color:#5c626d}
+  .ev{padding:6px 9px;border-radius:9px;background:rgba(255,255,255,.04);line-height:1.45;color:#c9cdd5;flex-shrink:0}
+  .ev .t{font-size:10px;letter-spacing:.05em;margin-right:7px}
+  .ev.entered .t{color:var(--green)} .ev.exited .t{color:var(--amber)}
+  .ev.inference .t{color:var(--purple)} .ev.behavior .t{color:var(--blue)}
+  .ev.identity_uncertain .t{color:var(--yellow)} .ev.state_change .t,.ev.action .t{color:var(--grey)}
+  .ev.qa{background:rgba(47,107,255,.12);border:1px solid rgba(47,107,255,.25);color:#dfe7ff}
+  .askrow{display:flex;gap:8px}
+  .askrow input{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+        border-radius:11px;padding:10px 13px;font-size:13.5px;color:#fff;outline:none;min-width:0}
+  .askrow input:focus{border-color:var(--accent)}
+  .askrow input::placeholder{color:#5c626d}
+  .rule-banner{margin-top:12px;padding:10px 14px;border-radius:11px;font-size:13px;display:none;
+        background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#c6cad2}
+  .rule-banner.on{display:block}
+  .rule-banner.alert{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4);color:#ffd7d7}
+
+  /* ---- what is gavi ---- */
+  .what-lines{margin-top:26px;font-size:clamp(20px,2.4vw,30px);font-weight:500;letter-spacing:-.015em;line-height:1.4}
+  .what-lines span{color:#b9bec7}
+  .compare{margin-top:48px;background:var(--panel);border-radius:var(--radius);padding:30px;overflow:hidden;color:#e8eaee}
+  .wm-grid{display:grid;grid-template-columns:.95fr 1.25fr 1fr;gap:26px}
+  .wm-grid>*{min-width:0}
+  @media(max-width:920px){.wm-grid{grid-template-columns:1fr}}
+  .wm-video{border-radius:14px;overflow:hidden;background:#000}
+  .wm-video video{width:100%;display:block;opacity:.9}
+  .wm-pipe{margin-top:12px;font-size:12px;color:#8d929c;text-align:center}
+  .wm-pipe b{color:var(--hud)}
+  .wm-loglist{display:flex;flex-direction:column;gap:6px;font-size:12.5px;min-height:280px}
+  .wm-line{display:flex;gap:10px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.04);
+           color:#c9cdd5;opacity:0;transform:translateY(4px);transition:all .35s}
+  .wm-line.in{opacity:1;transform:none}
+  .wm-line.hl{background:rgba(110,231,183,.14);outline:1px solid rgba(110,231,183,.4);color:#eafff5}
+  .wm-line .ts{color:#7d838d;flex-shrink:0}
+  .wm-line .eid{color:var(--hud);flex-shrink:0;width:22px}
+  .wm-q{background:rgba(47,107,255,.14);border:1px solid rgba(47,107,255,.3);border-radius:12px;
+        padding:12px 14px;font-size:14.5px;color:#dfe7ff;min-height:44px}
+  .wm-a{margin-top:12px;font-size:14px;line-height:1.55;color:#b8f5da;min-height:88px}
+  .wm-a b{color:#fff}
+  .wm-note{margin-top:16px;font-size:12px;color:#6a7078;line-height:1.5}
+  .plug-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:24px}
+  @media(max-width:820px){.plug-grid{grid-template-columns:1fr}}
+  .plug{border:1px solid var(--line);border-radius:20px;padding:26px}
+  .plug .num{font-size:12px;color:var(--accent);letter-spacing:.06em}
+  .plug h3{font-size:19px;font-weight:600;margin:22px 0 6px;letter-spacing:-.01em}
+  .plug p{color:var(--sub);font-size:14.5px;line-height:1.5}
+
+  footer{border-top:1px solid var(--line);padding:40px 0 56px;margin-top:20px;
+         display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--sub);font-size:14px}
+  .privacy{margin-top:14px;font-size:12px;color:#6a7078;line-height:1.5}
+
+  /* ===== responsive overrides — keep LAST so they beat every base rule ===== */
+  @media(max-width:1000px){
+    /* stacked: the widget becomes video + a tab bar switching one pane at a time */
+    .demo-grid{display:flex;flex-direction:column;height:auto;gap:16px}
+    .demo-col{display:contents}
+    .demo-center{order:1}
+    .sec-und{order:2}
+    .sec-disc{order:3}
+    .sec-ask{order:4}
+    .sec-watch{order:5}
+    .sec.grow{flex:none}
+    .sec-und,.sec-disc,.sec-ask,.sec-watch{display:none}
+    .sec.active{display:flex}
+    .sec>.col-label{display:none} /* the active tab already names the pane */
+    .wtabs{display:flex;gap:4px;margin-top:12px;background:rgba(255,255,255,.05);
+           border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:4px}
+    .wtab{flex:1;position:relative;padding:9px 4px;font-size:10px;letter-spacing:.05em;
+          color:#8d929c;border-radius:9px;transition:all .15s;white-space:nowrap}
+    .wtab b{color:inherit;font-weight:600}
+    .wtab.active{background:rgba(255,255,255,.12);color:#fff}
+    .wtab.unread::after{content:'';position:absolute;top:5px;right:7px;width:5px;height:5px;
+          border-radius:50%;background:var(--accent)}
+    .wtab-desc{display:block;margin-top:9px;font-size:12px;line-height:1.5;color:#8d929c}
+    .feed{flex:none;min-height:0;max-height:280px;height:auto}
+    .feed:not(:empty){min-height:140px}
+    .chat{flex:none;min-height:64px;max-height:200px}
+    /* identities become a horizontal strip to save vertical space */
+    .roster{flex-direction:row;height:auto;overflow-x:auto;overflow-y:hidden;
+            padding:0 12px 8px 0;
+            -webkit-mask-image:linear-gradient(90deg,#000 88%,transparent);
+            mask-image:linear-gradient(90deg,#000 88%,transparent)}
+    .roster .card{min-width:216px}
+  }
+  @media(max-width:700px){
+    section{padding:64px 0}
+    .demo-panel{padding:16px}
+    .tabs{gap:24px}
+    /* the hero CTAs are redundant on phones — the demos are one swipe away */
+    .hero-ctas{display:none}
+    .ctl{padding:8px 14px;font-size:13px}
+    .chip{font-size:11px;padding:4px 10px}
+    /* the world-log explainer, compacted */
+    .compare{padding:16px;border-radius:20px}
+    .wm-grid{gap:20px}
+    .wm-loglist{min-height:0;gap:4px;font-size:11px}
+    /* on phones, unrevealed log lines take no space — the log grows as it writes */
+    .wm-line{display:none}
+    .wm-line.in{display:flex}
+    .wm-line{padding:5px 8px;gap:8px}
+    .wm-line .eid{width:18px}
+    .wm-q{font-size:13px;padding:10px 12px;min-height:38px}
+    .wm-a{font-size:12.5px;min-height:0;margin-top:10px}
+    .wm-note{margin-top:12px;font-size:11px}
+    .wm-pipe{margin-top:8px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+<nav id="nav"><div class="wrap nav-in">
+  <a class="logo" href="#">GAVI<b>.</b></a>
+  <div class="nav-links">
+    <a href="#demos">Demos</a>
+    <a href="#what">What is GAVI</a>
+    <a href="/about">About</a>
+    <a class="pill primary" href="#live">Try it live</a>
+  </div>
+</div></nav>
+
+<!-- ================= HERO ================= -->
+<header class="hero"><div class="wrap">
+  <div class="hero-panel">
+    <div class="hero-stage">
+      <video src="/assets/hero.mp4" autoplay muted loop playsinline></video>
+      <div class="hero-shade"></div>
+      <canvas id="hud"></canvas>
+      <div class="hud-tag mono">computed by GAVI · replayed in sync</div>
+    </div>
+    <div class="hud-dom">
+      <div class="hud-act mono" id="hudAct"></div>
+      <div class="hud-cap mono" id="hudCap"><span class="cap-txt" id="hudCapTxt"></span></div>
+    </div>
+    <div class="hero-copy">
+      <div class="eyebrow mono">GENERAL&nbsp;ARTIFICIAL&nbsp;VISUAL&nbsp;INTELLIGENCE</div>
+      <h1>GAVI<b>.</b></h1>
+      <div class="oneliner">General intelligence for the visual world.</div>
+      <div class="hero-ctas">
+        <a class="pill primary" href="#demos">Watch it think&nbsp;→</a>
+        <a class="pill glass" href="#live">Point it at yourself</a>
+      </div>
+    </div>
+  </div>
+</div></header>
+
+<!-- ================= DEMOS ================= -->
+<section id="demos"><div class="wrap">
+  <span class="sec-eyebrow">Demos</span>
+  <h2>Watch GAVI watch.</h2>
+  <p class="sec-sub">Real footage, processed live — not a recording of results.</p>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-preset="permanence"><span class="n mono">01</span>Object permanence</button>
+    <button class="tab" data-preset="twins"><span class="n mono">02</span>Identical outfits</button>
+    <button class="tab" data-preset="loitering"><span class="n mono">03</span>Loitering &amp; behavior</button>
+    <button class="tab" data-preset="safety"><span class="n mono">04</span>Safety alerts</button>
+    <button class="tab" data-preset="site"><span class="n mono">05</span>Site awareness</button>
+    <button class="tab" data-preset="aerial"><span class="n mono">06</span>Aerial view</button>
+  </div>
+  <div class="tab-desc" id="tabDesc">He drops the bag and walks out of frame. GAVI keeps both in mind — and notices what changed when he returns.</div>
+
+  <div class="demo-panel">
+    <div class="demo-grid">
+      <div class="demo-col">
+        <div class="sec sec-disc">
+          <div class="col-label mono">DISCOVERED — PEOPLE &amp; THINGS</div>
+          <div class="roster" id="p_roster"></div>
+        </div>
+        <div class="sec sec-und grow active">
+          <div class="col-label mono">GAVI'S UNDERSTANDING</div>
+          <div class="feed" id="p_feed"></div>
+        </div>
+      </div>
+      <div class="demo-center">
+        <div class="stage">
+          <img id="presetView" alt="">
+          <div class="cover" id="presetCover">
+            <button class="pill primary" id="presetPlay" style="font-size:15px;padding:13px 28px">▶&nbsp;&nbsp;Play this demo</button>
+            <p>The clip streams through GAVI's world model on the server — every discovery, event and inference you'll see is computed live.</p>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctl" id="presetStopBtn" disabled>■ Stop</button>
+          <div class="chips mono">
+            <span class="chip"><b id="p_present">0</b>&nbsp;in frame</span>
+            <span class="chip"><b id="p_total">0</b>&nbsp;identities</span>
+            <span class="chip"><b id="p_cycle">—</b>&nbsp;cycle</span>
+          </div>
+        </div>
+        <div class="scene-line" id="p_scene"></div>
+        <div class="wtabs mono" id="p_wtabs">
+          <button class="wtab active" data-pane="und">UNDERSTANDING</button>
+          <button class="wtab" data-pane="disc">FOUND&nbsp;<b id="p_discCount"></b></button>
+          <button class="wtab" data-pane="ask">ASK</button>
+          <button class="wtab" data-pane="watch">WATCH</button>
+        </div>
+        <div class="wtab-desc" id="p_wtabDesc"></div>
+      </div>
+      <div class="demo-col">
+        <div class="sec sec-ask grow">
+          <div class="col-label mono">ASK GAVI</div>
+          <div class="chat" id="p_chat"></div>
+          <div class="askrow">
+            <input id="p_ask" placeholder="ask about what it's seeing…" autocomplete="off">
+          </div>
+          <div class="suggs" id="p_askSugg"></div>
+        </div>
+        <div class="sec sec-watch">
+          <div class="col-label mono">WATCH FOR SOMETHING</div>
+          <div class="askrow">
+            <input id="p_rule" placeholder="a plain-English condition…" autocomplete="off">
+          </div>
+          <div class="suggs" id="p_watchSugg"></div>
+          <div class="rule-banner" id="p_ruleBanner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<!-- ================= WHAT IS GAVI ================= -->
+<section id="what" style="padding-top:20px"><div class="wrap">
+  <span class="sec-eyebrow">What is GAVI</span>
+  <h2>A layer of intelligence<br>on any video feed.</h2>
+  <div class="what-lines">
+    CCTV. Webcam. Drone. Doorbell. <span>If it makes frames, GAVI can think about it.</span><br>
+    Other vision AI sees one frame at a time. <span>GAVI keeps a world model — so its
+    intelligence spans hours, not milliseconds.</span>
+  </div>
+
+  <div class="compare">
+    <div class="wm-grid">
+      <div>
+        <div class="col-label mono">1 · YOUR FEED</div>
+        <div class="wm-video"><video src="/assets/demo_permanence.mp4" autoplay muted loop playsinline></video></div>
+        <div class="wm-pipe mono">frames&nbsp;&nbsp;→&nbsp;&nbsp;<b>GAVI</b>&nbsp;&nbsp;→&nbsp;&nbsp;world log</div>
+      </div>
+      <div>
+        <div class="col-label mono">2 · THE WORLD LOG — EVERYTHING, TIMESTAMPED</div>
+        <div class="wm-loglist mono" id="wmLog"></div>
+      </div>
+      <div>
+        <div class="col-label mono">3 · LONG-HORIZON REASONING</div>
+        <div class="wm-q" id="wmQ">&nbsp;</div>
+        <div class="wm-a" id="wmA"></div>
+        <div class="wm-note">One question can span hours of the log — that's what a world model buys you.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="plug-grid">
+    <div class="plug"><span class="num mono">01</span>
+      <h3>Plug in a feed</h3><p>Any RTSP camera, webcam or video stream. No training, no setup.</p></div>
+    <div class="plug"><span class="num mono">02</span>
+      <h3>It builds a world</h3><p>Stable identities, a timeline of events, inferences about what happened off-screen.</p></div>
+    <div class="plug"><span class="num mono">03</span>
+      <h3>Ask. Watch. Alert.</h3><p>Question it in plain English, or set rules like “someone's been loitering for 10 minutes.”</p></div>
+  </div>
+</div></section>
+
+<!-- ================= TRY IT ================= -->
+<section id="live" style="padding-top:20px"><div class="wrap">
+  <span class="sec-eyebrow">Try it yourself</span>
+  <h2>Point it at yourself.</h2>
+  <p class="sec-sub">Walk out of frame and come back. Ask it how long you were gone.</p>
+
+  <div class="demo-panel">
+    <div class="demo-grid">
+      <div class="demo-col">
+        <div class="sec sec-disc">
+          <div class="col-label mono">DISCOVERED — PEOPLE &amp; THINGS</div>
+          <div class="roster" id="l_roster"></div>
+        </div>
+        <div class="sec sec-und grow active">
+          <div class="col-label mono">GAVI'S UNDERSTANDING</div>
+          <div class="feed" id="l_feed"></div>
+        </div>
+      </div>
+      <div class="demo-center">
+        <div class="stage">
+          <video id="liveVideo" playsinline muted></video>
+          <div class="cover" id="liveCover">
+            <button class="pill primary" id="liveStart" style="font-size:15px;padding:13px 28px">Start camera demo</button>
+            <p>Runs on your camera, in your browser. Frames are analyzed during your session only —
+               your world is deleted the moment you leave.</p>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctl" id="liveStopBtn" disabled>■ Stop</button>
+          <div class="chips mono">
+            <span class="chip"><b id="l_present">0</b>&nbsp;in frame</span>
+            <span class="chip"><b id="l_total">0</b>&nbsp;identities</span>
+            <span class="chip"><b id="l_cycle">—</b>&nbsp;cycle</span>
+          </div>
+        </div>
+        <div class="scene-line" id="l_scene"></div>
+        <div class="wtabs mono" id="l_wtabs">
+          <button class="wtab active" data-pane="und">UNDERSTANDING</button>
+          <button class="wtab" data-pane="disc">FOUND&nbsp;<b id="l_discCount"></b></button>
+          <button class="wtab" data-pane="ask">ASK</button>
+          <button class="wtab" data-pane="watch">WATCH</button>
+        </div>
+        <div class="wtab-desc" id="l_wtabDesc"></div>
+      </div>
+      <div class="demo-col">
+        <div class="sec sec-ask grow">
+          <div class="col-label mono">ASK GAVI</div>
+          <div class="chat" id="l_chat"></div>
+          <div class="askrow">
+            <input id="l_ask" placeholder="ask — e.g. how long was I gone?" autocomplete="off">
+          </div>
+          <div class="suggs" id="l_askSugg"></div>
+        </div>
+        <div class="sec sec-watch">
+          <div class="col-label mono">WATCH FOR SOMETHING</div>
+          <div class="askrow">
+            <input id="l_rule" placeholder="a plain-English condition…" autocomplete="off">
+          </div>
+          <div class="suggs" id="l_watchSugg"></div>
+          <div class="rule-banner" id="l_ruleBanner"></div>
+        </div>
+      </div>
+    </div>
+    <p class="privacy">Each visitor gets an isolated, ephemeral world model, deleted on disconnect. Research prototype —
+       expect a ~2s heartbeat and honesty about what it isn't sure of.</p>
+  </div>
+</div></section>
+
+<div class="wrap"><footer>
+  <div><span class="logo">GAVI<b>.</b></span>&nbsp;&nbsp;General Artificial Visual Intelligence</div>
+  <div class="mono" style="font-size:12px">OBSERVE&nbsp;·&nbsp;MATCH&nbsp;·&nbsp;REASON&nbsp;·&nbsp;REMEMBER</div>
+</footer></div>
+
+<script>
+const $=id=>document.getElementById(id);
+addEventListener('scroll',()=>$('nav').classList.toggle('scrolled',scrollY>8));
+
+/* ================= hero HUD: replay of REAL GAVI tracks =================
+   hero_tracks.json was produced by running the hero video through the actual
+   pipeline once, offline. The overlay replays those boxes and events synced
+   to the video clock — real output, zero latency, zero per-visitor cost. */
+(function(){
+  const cv=$('hud'),ctx=cv.getContext('2d'),video=document.querySelector('.hero-panel video');
+  let data=null;
+  fetch('/assets/hero_tracks.json').then(r=>r.json()).then(d=>{data=d;}).catch(()=>{});
+  function size(){const r=cv.parentElement.getBoundingClientRect();
+    if(r.width&&r.height){cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;}}
+  new ResizeObserver(size).observe(cv.parentElement);size();
+  function bracket(x,y,w,h,dp){
+    const c=Math.min(8*dp,w/3);
+    ctx.beginPath();
+    [[x,y+c,x,y,x+c,y],[x+w-c,y,x+w,y,x+w,y+c],[x+w,y+h-c,x+w,y+h,x+w-c,y+h],[x+c,y+h,x,y+h,x,y+h-c]]
+      .forEach(p=>{ctx.moveTo(p[0],p[1]);ctx.lineTo(p[2],p[3]);ctx.lineTo(p[4],p[5]);});
+    ctx.stroke();
+  }
+  const actEl=$('hudAct'),capEl=$('hudCap'),capTxt=$('hudCapTxt');
+  // The hero caption track is HAND-TIMED to the footage, like film subtitles —
+  // a first impression can't jitter. The alert lines are GAVI's real verdicts
+  // (fall / missing hard hat / blocked gate), tightened for rhythm; the raw,
+  // unedited output lives in the demos below.
+  const CAPTIONS=[
+    {t:[0.5,3.1], txt:'GAVI is watching all nine at once.'},
+    {t:[3.4,6.8], txt:'⚠ PERSON DOWN — hallway, CAM 05', alert:true},
+    {t:[7.3,9.5], txt:'Every worker tracked. Every action understood.'},
+    {t:[9.8,11.9], txt:'⚠ NO HARD HAT — e6, walking through the site', alert:true},
+    {t:[12.3,13.4], txt:'Now from a drone.'},
+    {t:[13.7,16.7], txt:'⚠ TRUCK BLOCKING THE GATE', alert:true},
+  ];
+  function render(){
+    const W=cv.width,H=cv.height,dp=devicePixelRatio;
+    ctx.clearRect(0,0,W,H);
+    if(data&&video.duration&&video.videoWidth){
+      const t=video.currentTime;
+      // The video is object-fit:cover — map normalized coords onto the
+      // DISPLAYED (scaled + cropped) video rect, not the panel rect, or
+      // every box drifts as soon as the panel isn't exactly 16:9.
+      const scale=Math.max(W/video.videoWidth,H/video.videoHeight);
+      const dw=video.videoWidth*scale,dh=video.videoHeight*scale;
+      const ox=(W-dw)/2,oy=(H-dh)/2;
+      const seg=(data.segments||[]).find(s=>t>=s.start&&t<s.end)||data.segments?.[0];
+      if(seg){
+        const tr=seg.tracks;
+        if(tr.length){
+          let i=tr.findIndex(s=>s.t>t); if(i<0)i=tr.length;
+          const a=tr[Math.max(0,i-1)], b=tr[Math.min(tr.length-1,i)];
+          const f=(b&&b.t!==a.t)?Math.min(1,Math.max(0,(t-a.t)/(b.t-a.t))):0;
+          const byId={}; for(const bx of (b?b.boxes:[]))byId[bx.id]=bx;
+          // boxes are quiet texture — the caption layer carries the story
+          ctx.lineWidth=1.2*dp;
+          for(const bx of a.boxes){
+            const nb=byId[bx.id]||bx; // lerp toward the next sample for smoothness
+            const box=bx.box.map((v,k)=>v+(nb.box[k]-v)*f);
+            const x=ox+box[0]*dw,y=oy+box[1]*dh,w=(box[2]-box[0])*dw,h=(box[3]-box[1])*dh;
+            ctx.strokeStyle='rgba(110,231,183,.5)';
+            bracket(x,y,w,h,dp);
+            if(w>52*dp){
+              ctx.font=`${10*dp}px ui-monospace,Menlo,monospace`;
+              ctx.fillStyle='rgba(110,231,183,.65)';
+              ctx.fillText(bx.id,x+3*dp,y-5*dp);
+            }
+          }
+        }
+        // hand-timed caption track — deterministic, cut to the footage
+        actEl.textContent=seg.label;
+        const c=CAPTIONS.find(c=>t>=c.t[0]&&t<c.t[1]);
+        if(c){
+          if(capTxt.textContent!==c.txt)capTxt.textContent=c.txt;
+          capEl.classList.toggle('alert',!!c.alert);
+          capEl.classList.add('show');
+        }else{
+          capEl.classList.remove('show');
+        }
+      }
+    }
+  }
+  (function tick(){render();requestAnimationFrame(tick);})();
+  // rAF pauses in hidden/throttled tabs — media events keep the HUD honest
+  video.addEventListener('seeked',render);
+  video.addEventListener('timeupdate',render);
+})();
+
+/* ================= shared demo runtime ================= */
+let ws=null, wsReady=null, active=null;   // active: 'preset' | 'live' | null
+function ensureWS(){
+  if(ws && ws.readyState===1) return Promise.resolve();
+  if(wsReady) return wsReady;
+  wsReady=new Promise(res=>{
+    ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
+    ws.onopen=()=>res();
+    ws.onmessage=e=>route(JSON.parse(e.data));
+    ws.onclose=()=>{ws=null;wsReady=null;};
+  });
+  return wsReady;
+}
+function send(o){ if(ws&&ws.readyState===1) ws.send(JSON.stringify(o)); }
+function esc(s){const d=document.createElement('div');d.textContent=s??'';return d.innerHTML;}
+function fmtDur(s){return s<60?Math.round(s)+'s':Math.round(s/60)+'m '+Math.round(s%60)+'s';}
+
+function makePanel(p){ // p: prefix 'p' | 'l'
+  return {
+    entities:{}, boxes:[],
+    reset(){this.entities={};this.boxes=[];$(p+'_feed').innerHTML='';$(p+'_roster').innerHTML='';
+      $(p+'_chat').innerHTML='';
+      // deliberately KEEP the rule input — a trigger typed before pressing
+      // play must survive the demo starting (it gets re-sent on start)
+      const rb=$(p+'_ruleBanner');rb.className='rule-banner';rb.innerHTML='';
+      $(p+'_present').textContent='0';$(p+'_total').textContent='0';$(p+'_cycle').textContent='—';
+      $(p+'_scene').textContent='';
+      $(p+'_discCount').textContent='';resetWtabs(p);},
+    event(type,html,tag,isHtml){
+      const el=document.createElement('div');el.className='ev '+type;
+      el.innerHTML='<span class="t mono">'+tag.toUpperCase()+'</span>'+(isHtml?html:esc(html));
+      const feed=$(p+'_feed');feed.prepend(el);
+      while(feed.children.length>70)feed.lastChild.remove();
+      markUnread(p,'und');
+    },
+    chat(html){
+      const el=document.createElement('div');el.className='msg';el.innerHTML=html;
+      const c=$(p+'_chat');
+      const pending=c.querySelector('.msg.pending');if(pending)pending.remove();
+      c.prepend(el);
+      while(c.children.length>12)c.lastChild.remove();
+      markUnread(p,'ask');
+    },
+    chatPending(q){
+      const el=document.createElement('div');el.className='msg pending';
+      el.innerHTML='<b>You:</b> '+esc(q)+'<br><i>thinking…</i>';
+      $(p+'_chat').prepend(el);
+    },
+    update(m){
+      $(p+'_present').textContent=m.present;$(p+'_total').textContent=m.total;
+      $(p+'_cycle').textContent=m.latency+'s';
+      $(p+'_discCount').textContent=m.total?('('+m.total+')'):'';
+      if(m.thumbs&&Object.keys(m.thumbs).length)markUnread(p,'disc');
+      if(m.scene)$(p+'_scene').textContent='“'+m.scene+'”';
+      this.boxes=m.boxes||[];
+      for(const en of (m.entities||[])){
+        this.entities[en.id]=Object.assign(this.entities[en.id]||{},en);
+        if(m.thumbs&&m.thumbs[en.id])this.entities[en.id].thumb=m.thumbs[en.id];
+      }
+      const r=$(p+'_roster');r.innerHTML='';
+      Object.values(this.entities).sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true})).forEach(en=>{
+        const c=document.createElement('div');c.className='card'+(en.present?' present':'');
+        c.innerHTML=(en.thumb?'<img src="data:image/jpeg;base64,'+en.thumb+'">':'<img alt="">')+
+          '<div class="meta"><div class="cid"><i></i>'+esc(en.id)+
+          '&nbsp;<span style="font-weight:400;color:#8d929c">'+esc(en.label||'')+'</span></div>'+
+          '<small>'+esc(en.description||'')+'</small>'+
+          '<small>on screen '+fmtDur(en.dwell||0)+(en.present?'':' · away')+'</small></div>';
+        r.appendChild(c);
+      });
+      for(const ev of (m.events||[]))this.event(ev.type,ev.text,ev.type.replace('_',' '));
+    },
+  };
+}
+const panels={p:makePanel('p'), l:makePanel('l')};
+
+/* mobile widget tabs: one pane at a time, unread dots on the rest */
+const PANE_DESCS={
+  und:"GAVI's live narration — what's happening, and what it infers about the gaps.",
+  disc:"Everyone and everything it's tracking, with a snapshot and time on screen.",
+  ask:"Ask about anything it has seen — answered from memory, with times.",
+  watch:"Describe a condition in plain English. GAVI watches the whole timeline for it.",
+};
+function setPaneDesc(pfx,pane){
+  const d=$(pfx+'_wtabDesc');if(d)d.textContent=PANE_DESCS[pane]||'';
+}
+function setupWtabs(pfx){
+  const bar=$(pfx+'_wtabs');if(!bar)return;
+  bar.querySelectorAll('.wtab').forEach(btn=>{
+    btn.onclick=()=>{
+      bar.querySelectorAll('.wtab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');btn.classList.remove('unread');
+      const root=bar.closest('.demo-panel');
+      root.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+      root.querySelector('.sec-'+btn.dataset.pane).classList.add('active');
+      setPaneDesc(pfx,btn.dataset.pane);
+    };
+  });
+  setPaneDesc(pfx,'und');
+}
+setupWtabs('p');setupWtabs('l');
+function markUnread(pfx,pane){
+  const btn=document.querySelector('#'+pfx+'_wtabs .wtab[data-pane='+pane+']');
+  if(btn&&!btn.classList.contains('active'))btn.classList.add('unread');
+}
+function resetWtabs(pfx){
+  const bar=$(pfx+'_wtabs');if(!bar)return;
+  bar.querySelectorAll('.wtab').forEach(b=>{
+    b.classList.remove('unread');b.classList.toggle('active',b.dataset.pane==='und');
+  });
+  const root=bar.closest('.demo-panel');
+  root.querySelectorAll('.sec').forEach(s=>s.classList.toggle('active',s.classList.contains('sec-und')));
+  setPaneDesc(pfx,'und');
+}
+
+function route(m){
+  const pfx = active==='live'?'l':'p';
+  const pn = panels[pfx];
+  if(m.type==='update')pn.update(m);
+  else if(m.type==='video_frame'&&active==='preset'){$('presetView').src='data:image/jpeg;base64,'+m.jpeg;}
+  else if(m.type==='answer')pn.chat('<b>You:</b> '+esc(m.question)+'<br><b>GAVI:</b> '+esc(m.text));
+  else if(m.type==='preset_ended'&&active==='preset'){pn.event('exited','Clip finished. Press play to run it again — or try another demo.','demo');presetStopped(true);}
+  else if(m.type==='rule_set'){
+    const b=$(pfx+'_ruleBanner');
+    if(m.text){b.classList.add('on');b.classList.remove('alert');b.innerHTML='👁 watching: <b>'+esc(m.text)+'</b>';}
+    else b.classList.remove('on');
+  }
+  else if(m.type==='expired'){pn.event('exited','Session expired (15 min). Refresh for a fresh world.','session');stopAll();}
+  else if(m.type==='error')pn.event('identity_uncertain','backend hiccup: '+esc(m.text),'error');
+  if(m.type==='update'&&m.rule){
+    const b=$(pfx+'_ruleBanner');b.classList.add('on');b.classList.toggle('alert',m.rule.triggered);
+    b.innerHTML=(m.rule.triggered?'🚨 ':'👁 ')+'<b>'+esc(m.rule.text)+'</b> — '+
+      (m.rule.triggered?'TRIGGERED ':'not triggered ')+'('+Math.round(m.rule.confidence*100)+'%). '+esc(m.rule.reason||'');
+    if(m.rule.triggered)markUnread(pfx,'watch');
+  }
+}
+
+/* ================= preset demos ================= */
+const PRESET_META={
+  permanence:{desc:"He drops the bag and walks out of frame. GAVI keeps both in mind — and notices what changed when he returns.",
+    ask:["What happened to the backpack?","How long was he gone?"],watch:["the bag is left unattended"]},
+  twins:{desc:"Two workers. Identical vests, identical helmets. Position and motion keep them apart — no faces needed.",
+    ask:["How many workers are there?","Are they the same person?"],watch:["the two workers are next to each other"]},
+  loitering:{desc:"Browsing, pacing, never buying. GAVI tracks dwell time and movement patterns, and calls out the behavior.",
+    ask:["What has the customer done so far?","Did they buy anything?"],watch:["someone is loitering without buying"]},
+  safety:{desc:"A man falls and stays down. Watch the understanding change — and ask it when the fall happened.",
+    ask:["When did he fall?","Is he moving?"],watch:["someone has fallen or is lying down"]},
+  site:{desc:"A working site, fully narrated: who's where, doing what — and who's missing a hard hat.",
+    ask:["How many workers are on site?","Is anyone missing PPE?"],watch:["a worker is not wearing a hard hat"]},
+  aerial:{desc:"Same brain, drone vantage. GAVI reads a logistics yard from above — including the truck blocking the gate.",
+    ask:["What vehicles do you see?","Is the gate clear?"],watch:["a truck is blocking the gate"]},
+};
+const LIVE_META={
+  ask:["How long have I been here?","What am I holding?","Who have you seen so far?"],
+  watch:["a person has been gone for 30 seconds","someone is holding a phone"],
+};
+function renderSuggs(pfx,meta){
+  const mk=(hostId,items,onPick)=>{
+    const host=$(hostId);host.innerHTML='';
+    items.forEach(txt=>{
+      const b=document.createElement('button');b.className='sugg';b.textContent=txt;
+      b.onclick=()=>onPick(txt);host.appendChild(b);
+    });
+  };
+  mk(pfx+'_askSugg',meta.ask,txt=>{
+    if(!ws||ws.readyState!==1)return;
+    send({type:'ask',text:txt});panels[pfx].chatPending(txt);
+  });
+  mk(pfx+'_watchSugg',meta.watch,txt=>{
+    if(!ws||ws.readyState!==1)return;
+    $(pfx+'_rule').value=txt;send({type:'rule',text:txt});
+  });
+}
+renderSuggs('p',PRESET_META[ 'permanence']);
+renderSuggs('l',LIVE_META);
+let currentPreset='permanence', presetRunning=false;
+function setPoster(){$('presetView').src='/assets/poster_'+currentPreset+'.jpg';}
+setPoster();
+
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.onclick=()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const wasRunning=presetRunning;
+    if(presetRunning)stopPreset();
+    currentPreset=tab.dataset.preset;
+    $('tabDesc').textContent=PRESET_META[currentPreset].desc;
+    renderSuggs('p',PRESET_META[currentPreset]);
+    panels.p.reset();setPoster();$('presetCover').style.display='flex';
+    if(wasRunning)startPreset();
+  };
+});
+async function startPreset(){
+  if(active==='live')stopLive();
+  active='preset';presetRunning=true;
+  panels.p.reset();$('presetCover').style.display='none';
+  $('presetStopBtn').disabled=false;
+  await ensureWS();
+  send({type:'start_preset',name:currentPreset});
+  // starting resets the server-side world — re-arm a trigger typed beforehand
+  const rule=$('p_rule').value.trim();
+  if(rule)send({type:'rule',text:rule});
+}
+function stopPreset(){send({type:'stop'});presetStopped(false);}
+function presetStopped(ended){
+  presetRunning=false;
+  $('presetStopBtn').disabled=true;
+  // cover over the frozen last frame is the single (re)play affordance
+  $('presetCover').style.display='flex';
+  if(!ended&&active==='preset')panels.p.event('exited','Demo stopped.','demo');
+}
+$('presetPlay').onclick=startPreset;
+$('presetStopBtn').onclick=stopPreset;
+$('p_ask').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.value.trim()&&ws){
+    send({type:'ask',text:e.target.value.trim()});
+    panels.p.chatPending(e.target.value.trim());
+    e.target.value='';
+  }
+});
+$('p_rule').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&ws)send({type:'rule',text:e.target.value.trim()});
+});
+
+/* ================= live demo ================= */
+let pump=null,stream=null;
+const liveVideo=$('liveVideo'),cap=document.createElement('canvas'),capCtx=cap.getContext('2d');
+$('liveStart').onclick=startLive;
+async function startLive(){
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280}},audio:false});}
+  catch(e){$('liveCover').querySelector('p').textContent='Camera permission was denied — allow camera access and try again.';return;}
+  if(presetRunning)stopPreset();
+  active='live';
+  liveVideo.srcObject=stream;await liveVideo.play();
+  panels.l.reset();$('liveCover').style.display='none';$('liveStopBtn').disabled=false;
+  await ensureWS();
+  send({type:'start_live'});
+  // starting resets the server-side world — re-arm a trigger typed beforehand
+  const lrule=$('l_rule').value.trim();
+  if(lrule)send({type:'rule',text:lrule});
+  pump=setInterval(()=>{
+    if(!ws||ws.readyState!==1||!liveVideo.videoWidth)return;
+    cap.width=640;cap.height=Math.round(640*liveVideo.videoHeight/liveVideo.videoWidth);
+    capCtx.drawImage(liveVideo,0,0,cap.width,cap.height);
+    send({type:'frame',jpeg:cap.toDataURL('image/jpeg',.7).split(',')[1]});
+  },350);
+}
+function stopLive(){
+  send({type:'stop'});
+  clearInterval(pump);pump=null;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+  liveVideo.srcObject=null;
+  $('liveStopBtn').disabled=true;$('liveCover').style.display='flex';
+  if(active==='live'){panels.l.event('exited','Camera stopped. Your session world is deleted when you leave the page.','demo');active=null;}
+}
+$('liveStopBtn').onclick=stopLive;
+$('l_ask').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.value.trim()&&ws){
+    send({type:'ask',text:e.target.value.trim()});
+    panels.l.chatPending(e.target.value.trim());
+    e.target.value='';
+  }
+});
+$('l_rule').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&ws)send({type:'rule',text:e.target.value.trim()});
+});
+function stopAll(){if(presetRunning)stopPreset();if(active==='live')stopLive();}
+
+/* ================= what-is-GAVI: feed -> world log -> long-horizon reasoning ================= */
+(function(){
+  const LOG=[
+    ['09:41','e1','person entered — grey coat, carrying a black bag'],
+    ['09:44','e1','placed the black bag beside the bench'],
+    ['09:52','e1','left the frame — still tracked'],
+    ['10:18','e2','person entered — red jacket'],
+    ['10:22','e2','sat on the bench, on their phone'],
+    ['11:03','e2','left the frame — bag still unattended'],
+    ['12:30','e4','cleaning cart passed through'],
+    ['13:07','e1','re-entered after 3h 15m away'],
+    ['13:08','e1','picked the black bag back up'],
+  ];
+  const QAS=[
+    {q:'Whose bag is that?',hl:[1,7,8],
+     a:'<b>e1</b>’s. He set it down at <b>09:44</b> and came back for it at <b>13:07</b> — same person, same identity, 3.4 hours apart.'},
+    {q:'Did anyone touch it while he was gone?',hl:[4,5,6],
+     a:'No. <b>e2</b> sat nearby until 11:03 and a cleaning cart passed at 12:30 — the bag was never touched.'},
+    {q:'Alert me if a bag is left for over an hour.',hl:[1,2],
+     a:'Understood — and looking back, that rule would have fired at <b>10:44</b>, one hour after e1 walked away.'},
+  ];
+  const logEl=$('wmLog'),qEl=$('wmQ'),aEl=$('wmA');
+  let lines=[];
+  function buildLog(){
+    logEl.innerHTML='';lines=[];
+    LOG.forEach(([ts,eid,txt])=>{
+      const el=document.createElement('div');el.className='wm-line';
+      el.innerHTML='<span class="ts">'+ts+'</span><span class="eid">'+eid+'</span><span>'+txt+'</span>';
+      logEl.appendChild(el);lines.push(el);
+    });
+  }
+  async function run(){
+    const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+    for(;;){
+      buildLog();qEl.innerHTML='&nbsp;';aEl.innerHTML='';
+      for(const el of lines){el.classList.add('in');await sleep(420);}
+      await sleep(600);
+      for(const qa of QAS){
+        lines.forEach(l=>l.classList.remove('hl'));
+        qEl.textContent='';aEl.innerHTML='';
+        for(let i=0;i<=qa.q.length;i+=2){qEl.textContent=qa.q.slice(0,i);await sleep(18);}
+        qEl.textContent=qa.q;
+        await sleep(350);
+        for(const i of qa.hl){lines[i].classList.add('hl');await sleep(260);}
+        await sleep(350);
+        aEl.innerHTML=qa.a;
+        await sleep(4200);
+      }
+      lines.forEach(l=>l.classList.remove('hl'));
+      await sleep(800);
+    }
+  }
+  run();
+})();
+</script>
+</body>
+</html>

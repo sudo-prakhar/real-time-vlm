@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gavi",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "python3 -m uvicorn app:app --host 127.0.0.1 --port ${PORT:-8010}"],
+      "autoPort": true,
+      "port": 8010
+    }
+  ]
+}

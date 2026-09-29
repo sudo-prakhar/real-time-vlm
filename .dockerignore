@@ -1,0 +1,13 @@
+.env
+.git
+.claude
+evidence/
+world/
+__pycache__/
+*.pyc
+camtest.py
+world_run.py
+make_hero.py
+Makefile
+README.md
+.env.*

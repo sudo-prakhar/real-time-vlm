@@ -1,0 +1,33 @@
+# Secrets — never commit. Copy .env.example to .env and fill it in.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*.json
+service-account*.json
+
+# Runtime output (camera captures, world-model state)
+evidence/
+world/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Local tool config
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
