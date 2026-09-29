@@ -229,3 +229,10 @@ registry, event timeline, prompts, persistence) and
 update cycle is [gavi/engine.py](gavi/engine.py), driven by
 [gavi/world_monitor.py](gavi/world_monitor.py) in the terminal and
 [gavi/server.py](gavi/server.py) on the web.
+
+## License
+
+[PolyForm Noncommercial 1.0.0](LICENSE.md). You're free to use, modify, and
+build on this for any noncommercial purpose: personal projects, study,
+research, hobby work, and use by charities, schools, and public institutions.
+Commercial use is not permitted.
